@@ -130,6 +130,7 @@ interface ExecutionTarget {
                                                        // excludes node_modules/.git/build artifacts
   exec(cmd: WorkflowRef | string): ProcessHandle      // streamed
   installPackages(pkgs: string[]): Promise<Result>
+  removePackages(pkgs: string[]): Promise<Result>     // <nihil-remove-dependency>
   getPreviewUrl(): Promise<string>
   streamLogs(): AsyncIterable<LogEvent>               // feeds healer.ts
   snapshot(): Promise<SnapshotRef>                     // pairs with git versioning

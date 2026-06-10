@@ -239,6 +239,15 @@ describe("supplementary protocol behavior", () => {
     expect(c.closes).toHaveLength(0);
   });
 
+  it("NUL and C0 control characters in a path are rejected with PATH_FORBIDDEN", () => {
+    const { parser, c } = harness();
+    const nul = String.fromCharCode(0x00);
+    const ctrl = String.fromCharCode(0x1f);
+    feed(parser, `<nihil-write path="src/a${nul}b.ts">\nx\n</nihil-write>\n<nihil-delete path="src/c${ctrl}d.ts"/>`);
+    expect(c.errors.filter((e) => e.code === "PATH_FORBIDDEN")).toHaveLength(2);
+    expect(c.closes).toHaveLength(0);
+  });
+
   it("missing required attribute → MALFORMED_TAG, body consumed", () => {
     const { parser, c } = harness();
     feed(parser, `<nihil-write description="no path">\nlost content\n</nihil-write>\nafter`);

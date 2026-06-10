@@ -16,7 +16,8 @@ Tauri 2 + React shell, Node daemon sidecar, hybrid sandbox. Apache-2.0.
 
 ## Invariants (never break)
 
-- `packages/protocol` tests stay green: `cd packages/protocol && npx vitest run` → 20/20.
+- `packages/protocol` tests stay green: `cd packages/protocol && npx vitest run` (conformance
+  + fuzz/property suites all pass; conformance is the SPEC contract, 21 cases and counting).
   Protocol changes require SPEC.md + conformance-test updates in the same PR.
 - No code from `~/refs/libra` (AGPL) or `~/refs/dyad/src/pro/` (proprietary). Ever.
 - No `@webcontainer/api` dependency.

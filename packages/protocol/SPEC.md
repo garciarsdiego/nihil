@@ -35,7 +35,7 @@ Out of scope: the system prompt that teaches the model the protocol (lives in `p
 
 ## 4. Tag Catalog
 
-All tags use the `nihil-` prefix. Attributes are double-quoted, XML-escaped (`&quot; &amp; &lt; &gt;`). Paths are always **relative to project root**, forward slashes, normalized by the parser.
+All tags use the `nihil-` prefix. Attributes are double-quoted, XML-escaped (`&quot; &amp; &lt; &gt;`). Paths are always **relative to project root**, forward slashes, normalized by the parser. Paths containing NUL or any C0 control character (U+0000–U+001F) are rejected with `PATH_FORBIDDEN`.
 
 ### 4.1 `<nihil-write>` — create or overwrite a file
 

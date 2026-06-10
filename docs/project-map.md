@@ -2,7 +2,7 @@
 
 **High-level view: phases, goals, exit criteria, and operating model.**
 Task-level detail lives in `HANDOFF.md` §5; architecture in `docs/technical-spec.md`; this document is the map.
-Last updated: 2026-06-11 · Current position: **Phase 2 (Core Loop), Tasks 1–4 of 6 complete · Task 5 (vite-react-shadcn template) next**
+Last updated: 2026-06-11 · Current position: **Phase 2 (Core Loop), Tasks 1–5 of 6 complete · first real-model smoke gate runs before Task 6 (minimal Tauri shell)**
 
 ---
 
@@ -43,7 +43,7 @@ Last updated: 2026-06-11 · Current position: **Phase 2 (Core Loop), Tasks 1–4
 ## Phase 2 — Core Loop (M1) 🔶 IN PROGRESS
 
 **Goal:** the first end-to-end generation — prompt in, running app out.
-**Scope:** daemon (Fastify HTTP+WS ✅ Task 1); ExecutionTarget interface + local-process target (✅ Task 2: spawn, framework detection, preview proxy, log hub, process-tree kill); runner with git transactions per message (✅ Task 3: parser-event consumption, execute-on-close, dependency batching, longRunning deferral, git transaction with Nihil-Message-Id trailer + rollback, nihil-output feedback loop); BYOK/OmniRoute engine with the protocol-teaching system prompt (✅ Task 4: OpenAI-compatible SSE streaming engine, 5-slot prompt assembly + context selector, the turn loop wiring engine → parser → runner → nihil-output feedback, abort/retry/error taxonomy); `vite-react-shadcn` template (🔶 Task 5); minimal Tauri shell — chat, streaming action cards, preview iframe, sidecar lifecycle (Task 6).
+**Scope:** daemon (Fastify HTTP+WS ✅ Task 1); ExecutionTarget interface + local-process target (✅ Task 2: spawn, framework detection, preview proxy, log hub, process-tree kill); runner with git transactions per message (✅ Task 3: parser-event consumption, execute-on-close, dependency batching, longRunning deferral, git transaction with Nihil-Message-Id trailer + rollback, nihil-output feedback loop); BYOK/OmniRoute engine with the protocol-teaching system prompt (✅ Task 4: OpenAI-compatible SSE streaming engine, 5-slot prompt assembly + context selector, the turn loop wiring engine → parser → runner → nihil-output feedback, abort/retry/error taxonomy); `vite-react-shadcn` template (✅ Task 5: salvaged from the droid readiness package — React 19 / Vite 8 / TS 6 / Tailwind v4 / shadcn ejected, `nihil.config.json` workflows, intentional landing page; the integration check surfaced and fixed the gitignored-`.nihil/` commit bug and the vite IPv4 proxy binding); **first real-model smoke gate** — the engine fires through OmniRoute against the template, measurement before any prompt tuning — runs **before** the minimal Tauri shell (chat, streaming action cards, preview iframe, sidecar lifecycle — Task 6).
 **Exit criterion:** type a prompt in the shell → app generated, dev server running, preview visible, change committed with `Nihil-Message-Id` trailer.
 **Watch items:** Windows process semantics (verified-live approach is working); WS envelope stays internal contract (DECISIONS); `nihil.config.json` model-writability flagged for Task 3 UI treatment.
 

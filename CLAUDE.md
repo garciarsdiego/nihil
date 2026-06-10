@@ -9,7 +9,8 @@ Tauri 2 + React shell, Node daemon sidecar, hybrid sandbox. Apache-2.0.
    for parser, runner, daemon, and UI behavior. Read it BEFORE touching any of those.
 2. `docs/technical-spec.md` — architecture, ExecutionTarget interface, roadmap.
 3. `HANDOFF.md` — milestone task breakdown, reference repos, vendoring process.
-4. `docs/source-mapping.md` — why each pattern was chosen (background).
+4. `DECISIONS.md` — post-handoff decision log (continues the HANDOFF §3 table).
+5. `docs/source-mapping.md` — why each pattern was chosen (background).
 
 ## Invariants (never break)
 
@@ -48,7 +49,8 @@ cd packages/protocol && npx vitest watch   # protocol TDD loop
 ## Conventions
 
 - Code/comments/docs/commits in English; TypeScript strict, ESM (NodeNext);
-  vitest; no default exports in daemon code; zero runtime deps in packages/protocol.
+  vitest; no default exports in daemon code; zero runtime deps in the
+  @nihil/protocol main entry (`./schemas` peer-depends on zod — DECISIONS #10).
 - Conventional Commits (`feat(daemon): …`). Git transactions inside generated
   apps carry a `Nihil-Message-Id:` trailer.
 - Plan-first on large tasks: present the plan before writing code.

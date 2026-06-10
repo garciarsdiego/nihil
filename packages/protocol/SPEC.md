@@ -17,7 +17,7 @@ LLM response stream → PARSER (incremental) → RUNNER (executes vs ExecutionTa
                        UI (live render)          FEEDBACK (<nihil-output> → next turn)
 ```
 
-Out of scope: the system prompt that teaches the model the protocol (lives in `packages/knowledge`), and ExecutionTarget internals (lives in `apps/daemon/src/exec`).
+Out of scope: the system prompt that teaches the model the protocol (lives in `packages/knowledge`), and ExecutionTarget internals (lives in `apps/daemon/src/exec`). Transport between Nihil components (daemon↔shell) is out of scope; only payload types are governed here.
 
 ## 2. Design Principles
 
@@ -201,7 +201,7 @@ declare function serializeOutput(o: NihilOutput): string;   // <nihil-output> bu
 declare const PROTOCOL_VERSION: "1.0";
 ```
 
-Zod schemas ship alongside the types for runtime validation at the daemon boundary.
+Zod schemas for runtime validation at the daemon boundary ship under the `./schemas` subpath export (`@nihil/protocol/schemas`), with `zod` as a peerDependency. The main entry keeps zero runtime dependencies.
 
 ## 10. Conformance Test Matrix (parser must pass before M1)
 

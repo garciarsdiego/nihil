@@ -1,0 +1,12 @@
+# Normalize all text files to LF in the repository (SPEC.md §10.13 assumes
+# EOL-normalized content; Windows checkouts get LF too, keeping parser inputs
+# and git diffs byte-stable across platforms).
+* text=auto eol=lf
+# Windows batch scripts break under cmd.exe with LF-only endings
+# (M3 Capacitor templates will bring gradlew.bat).
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

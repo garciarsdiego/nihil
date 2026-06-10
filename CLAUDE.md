@@ -10,7 +10,9 @@ Tauri 2 + React shell, Node daemon sidecar, hybrid sandbox. Apache-2.0.
 2. `docs/technical-spec.md` — architecture, ExecutionTarget interface, roadmap.
 3. `HANDOFF.md` — milestone task breakdown, reference repos, vendoring process.
 4. `DECISIONS.md` — post-handoff decision log (continues the HANDOFF §3 table).
-5. `docs/source-mapping.md` — why each pattern was chosen (background).
+5. `docs/project-map.md` — phase-level view (phase 0 → horizon); update its
+   position marker whenever a task completes.
+6. `docs/source-mapping.md` — why each pattern was chosen (background).
 
 ## Invariants (never break)
 

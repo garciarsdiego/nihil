@@ -128,6 +128,8 @@ interface ExecutionTarget {
   copy(from: string, to: string): Promise<void>
   listFiles(prefix?: string): Promise<string[]>        // recursive, project-relative;
                                                        // excludes node_modules/.git/build artifacts
+  statFiles(prefix?: string): Promise<FileStat[]>      // listFiles + { mtimeMs, size }
+                                                       // (context budget: newest-first, size-skip)
   exec(cmd: WorkflowRef | string): ProcessHandle      // streamed
   installPackages(pkgs: string[]): Promise<Result>
   removePackages(pkgs: string[]): Promise<Result>     // <nihil-remove-dependency>

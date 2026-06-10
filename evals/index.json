@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0",
+  "corpusVersion": "2026-04-evals-v1",
+  "generatedAt": "2026-04-28T00:00:00Z",
+  "totalItems": 30,
+  "categories": [
+    {
+      "id": "protocol-core",
+      "name": "Protocol Core",
+      "description": "Basic tag emission, write completeness, path rules, escaping, closing-tag placement, multiple actions per message.",
+      "itemCount": 5
+    },
+    {
+      "id": "edit-dynamics",
+      "name": "Edit Dynamics",
+      "description": "Exact SEARCH matching, context sufficiency, sequential dependent blocks, ambiguity, whitespace fallback, unseen files.",
+      "itemCount": 5
+    },
+    {
+      "id": "structural-ops",
+      "name": "Structural Operations",
+      "description": "Rename (with required import fixes), delete, copy-then-edit, missing file handling, rename side-effects.",
+      "itemCount": 5
+    },
+    {
+      "id": "deps-execution",
+      "name": "Dependencies & Execution",
+      "description": "add/remove-dependency batching and ordering, named workflows only, long-running deferral, unknown workflow recovery.",
+      "itemCount": 5
+    },
+    {
+      "id": "plan-discipline",
+      "name": "Plan Mode Discipline",
+      "description": "Exactly one plan tag, concrete executable steps, trivial-task escape hatch, plan+action violation, vagueness penalty, convention matching.",
+      "itemCount": 5
+    },
+    {
+      "id": "feedback-recovery",
+      "name": "Feedback & Self-Correction",
+      "description": "EDIT_NO_MATCH recovery (exact or rewrite), unknown workflow correction, path boundary correction, validator stub removal, no lengthy apology + no repeat failure.",
+      "itemCount": 5
+    }
+  ],
+  "items": [
+    {"id": "protocol-core-001", "category": "protocol-core", "title": "Complete write with no elision", "file": "corpus/protocol-core/001-complete-write-no-elision.md", "difficulty": "basic", "probes": ["write-complete", "no-elision", "fence-handling", "closing-tag-line-start"], "status": "ready"},
+    {"id": "protocol-core-002", "category": "protocol-core", "title": "Literal protocol tag inside written content must be escaped", "file": "corpus/protocol-core/002-literal-tag-escape.md", "difficulty": "basic", "probes": ["literal-tag-escape", "write-complete"], "status": "ready"},
+    {"id": "protocol-core-003", "category": "protocol-core", "title": "Model must not emit forbidden paths (.., absolute)", "file": "corpus/protocol-core/003-path-traversal-refusal.md", "difficulty": "medium", "probes": ["path-rules", "PATH_FORBIDDEN"], "status": "ready"},
+    {"id": "protocol-core-004", "category": "protocol-core", "title": "Multiple writes in one message, correct ordering and prose", "file": "corpus/protocol-core/004-multiple-writes-order.md", "difficulty": "basic", "probes": ["multiple-actions", "ordering", "brief-prose"], "status": "ready"},
+    {"id": "protocol-core-005", "category": "protocol-core", "title": "Closing tag must be at line start (even when content contains tags)", "file": "corpus/protocol-core/005-closing-tag-placement.md", "difficulty": "medium", "probes": ["closing-tag-disambiguation", "literal-content"], "status": "ready"},
+
+    {"id": "edit-dynamics-001", "category": "edit-dynamics", "title": "Exact SEARCH with sufficient surrounding context", "file": "corpus/edit-dynamics/001-exact-search-with-context.md", "difficulty": "basic", "probes": ["exact-match", "context-lines"], "status": "ready"},
+    {"id": "edit-dynamics-002", "category": "edit-dynamics", "title": "Insufficient context leads to ambiguous or failed match (model must add more)", "file": "corpus/edit-dynamics/002-insufficient-context-ambiguous.md", "difficulty": "medium", "probes": ["EDIT_AMBIGUOUS", "context-sufficiency"], "status": "ready"},
+    {"id": "edit-dynamics-003", "category": "edit-dynamics", "title": "Multi-block edit where later blocks depend on earlier results", "file": "corpus/edit-dynamics/003-sequential-blocks.md", "difficulty": "medium", "probes": ["sequential-apply", "dependent-blocks"], "status": "ready"},
+    {"id": "edit-dynamics-004", "category": "edit-dynamics", "title": "Model provides exact text; ws-normalized fallback is only a safety net", "file": "corpus/edit-dynamics/004-whitespace-normalized-fallback.md", "difficulty": "medium", "probes": ["exact-vs-fuzzy-ws", "apply-chain"], "status": "ready"},
+    {"id": "edit-dynamics-005", "category": "edit-dynamics", "title": "File not shown in context — model must not guess contents", "file": "corpus/edit-dynamics/005-file-not-in-context.md", "difficulty": "basic", "probes": ["context-trust", "FILE_NOT_FOUND"], "status": "ready"},
+
+    {"id": "structural-ops-001", "category": "structural-ops", "title": "Rename a file and update all imports in the same turn", "file": "corpus/structural-ops/001-rename-plus-import-fix.md", "difficulty": "medium", "probes": ["rename", "import-fix", "no-magic-rename"], "status": "ready"},
+    {"id": "structural-ops-002", "category": "structural-ops", "title": "Delete a file that is confirmed unused", "file": "corpus/structural-ops/002-delete-unused.md", "difficulty": "basic", "probes": ["delete", "exact-request", "no-drive-by"], "status": "ready"},
+    {"id": "structural-ops-003", "category": "structural-ops", "title": "Copy a template file then customize it with edit", "file": "corpus/structural-ops/003-copy-then-customize.md", "difficulty": "basic", "probes": ["copy", "copy-then-edit", "post-copy-search"], "status": "ready"},
+    {"id": "structural-ops-004", "category": "structural-ops", "title": "Delete on a non-existent path produces FILE_NOT_FOUND (model should not emit it)", "file": "corpus/structural-ops/004-delete-missing-file.md", "difficulty": "basic", "probes": ["delete-missing", "FILE_NOT_FOUND", "tree-trust"], "status": "ready"},
+    {"id": "structural-ops-005", "category": "structural-ops", "title": "Rename that would break imports — model fixes in same turn or notes the risk", "file": "corpus/structural-ops/005-rename-breaks-imports-model-fixes.md", "difficulty": "medium", "probes": ["rename-side-effects", "risk-note"], "status": "ready"},
+
+    {"id": "deps-execution-001", "category": "deps-execution", "title": "Add multiple dependencies in one tag — they are batched", "file": "corpus/deps-execution/001-add-deps-batched.md", "difficulty": "basic", "probes": ["add-dependency", "batching", "genuine-requirements"], "status": "ready"},
+    {"id": "deps-execution-002", "category": "deps-execution", "title": "Dependencies installed before a workflow run in the same turn", "file": "corpus/deps-execution/002-deps-then-run.md", "difficulty": "basic", "probes": ["dep-before-run", "ordering"], "status": "ready"},
+    {"id": "deps-execution-003", "category": "deps-execution", "title": "Unknown workflow name produces UNKNOWN_WORKFLOW (model must use only declared ones)", "file": "corpus/deps-execution/003-unknown-workflow.md", "difficulty": "basic", "probes": ["named-workflow-only", "UNKNOWN_WORKFLOW"], "status": "ready"},
+    {"id": "deps-execution-004", "category": "deps-execution", "title": "Long-running workflow (dev) must be emitted last even if it reads naturally earlier", "file": "corpus/deps-execution/004-long-running-last.md", "difficulty": "medium", "probes": ["long-running-deferral", "dev-last"], "status": "ready"},
+    {"id": "deps-execution-005", "category": "deps-execution", "title": "Remove a dependency that is no longer used", "file": "corpus/deps-execution/005-remove-dep.md", "difficulty": "basic", "probes": ["remove-dependency", "symmetric-minimalism"], "status": "ready"},
+
+    {"id": "plan-discipline-001", "category": "plan-discipline", "title": "Good plan-mode output with concrete, executable steps", "file": "corpus/plan-discipline/001-proper-plan-concrete-steps.md", "difficulty": "basic", "probes": ["single-plan-tag", "concrete-steps", "risks-section"], "status": "ready"},
+    {"id": "plan-discipline-002", "category": "plan-discipline", "title": "Trivial change in plan mode — model proposes direct execution instead of padding a plan", "file": "corpus/plan-discipline/002-trivial-task-bypass.md", "difficulty": "basic", "probes": ["trivial-escape-hatch", "no-plan-theater"], "status": "ready"},
+    {"id": "plan-discipline-003", "category": "plan-discipline", "title": "Plan mode + any other action tag is a hard violation (negative test)", "file": "corpus/plan-discipline/003-plan-mode-violation.md", "difficulty": "basic", "probes": ["PLAN_MODE_VIOLATION", "no-mixed-tags"], "status": "ready"},
+    {"id": "plan-discipline-004", "category": "plan-discipline", "title": "Vague steps are penalized; concrete naming is required", "file": "corpus/plan-discipline/004-vague-plan-penalized.md", "difficulty": "medium", "probes": ["concrete-naming", "no-vagueness"], "status": "ready"},
+    {"id": "plan-discipline-005", "category": "plan-discipline", "title": "Plan names files and approaches that match project conventions", "file": "corpus/plan-discipline/005-plan-respects-conventions.md", "difficulty": "medium", "probes": ["convention-matching", "shadcn-preference"], "status": "ready"},
+
+    {"id": "feedback-recovery-001", "category": "feedback-recovery", "title": "EDIT_NO_MATCH — model must re-read the excerpt and use exact text or switch to write", "file": "corpus/feedback-recovery/001-edit-no-match-retry-exact-or-write.md", "difficulty": "medium", "probes": ["EDIT_NO_MATCH", "re-read-excerpt", "no-repeat-failure"], "status": "ready"},
+    {"id": "feedback-recovery-002", "category": "feedback-recovery", "title": "Unknown workflow — model switches to a declared one on feedback", "file": "corpus/feedback-recovery/002-unknown-workflow-then-correct.md", "difficulty": "basic", "probes": ["UNKNOWN_WORKFLOW-recovery", "error-priority"], "status": "ready"},
+    {"id": "feedback-recovery-003", "category": "feedback-recovery", "title": "PATH_FORBIDDEN — model narrows scope to the visible project root on recovery", "file": "corpus/feedback-recovery/003-path-forbidden-scope-correction.md", "difficulty": "medium", "probes": ["PATH_FORBIDDEN-recovery", "boundary-respect"], "status": "ready"},
+    {"id": "feedback-recovery-004", "category": "feedback-recovery", "title": "Validator warning on TODO stub — model removes the placeholder before finishing the turn or in immediate follow-up", "file": "corpus/feedback-recovery/004-validator-todo-stub.md", "difficulty": "medium", "probes": ["VALIDATOR_FAILED", "no-stubs", "artifact-guard"], "status": "ready"},
+    {"id": "feedback-recovery-005", "category": "feedback-recovery", "title": "No lengthy apologies; no repeating a failed edit; concise ack + smallest fix", "file": "corpus/feedback-recovery/005-no-lengthy-apology-repeat-failure.md", "difficulty": "basic", "probes": ["concise-ack", "smallest-fix", "no-apology-theater"], "status": "ready"}
+  ],
+  "notes": "All items are original text written to probe specific sentences and tables in packages/protocol/SPEC.md §4 and packages/knowledge/prompts/engine-prompts.md. No source code from the project is embedded in the corpus items."
+}

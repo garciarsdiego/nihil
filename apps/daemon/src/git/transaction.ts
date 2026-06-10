@@ -86,8 +86,15 @@ export class SystemGitBackend implements GitBackend {
 
   async commitAll(opts: CommitOptions): Promise<CommitResult> {
     assertSafeMessageId(opts.messageId);
-    // Stage everything except the daemon's own .nihil/ metadata.
-    await git(this.#dir, ["add", "-A", "--", ".", ":(exclude).nihil"]);
+    // Stage everything, then unstage the daemon's own .nihil/ metadata. We add
+    // and then reset rather than `add ... :(exclude).nihil`, because naming
+    // .nihil in an exclude pathspec makes `git add` fail with "paths are
+    // ignored" once the project's .gitignore lists .nihil/ (which every real
+    // template does, and the transaction marker lives there during the commit).
+    // `add -A .` skips a gitignored .nihil silently; the reset is then a no-op,
+    // and it still unstages the marker for projects that do NOT gitignore it.
+    await git(this.#dir, ["add", "-A", "--", "."]);
+    await git(this.#dir, ["reset", "-q", "--", ".nihil"]);
     const dirty = (await gitExit(this.#dir, ["diff", "--cached", "--quiet"])) !== 0;
     if (!dirty) {
       return { committed: false };

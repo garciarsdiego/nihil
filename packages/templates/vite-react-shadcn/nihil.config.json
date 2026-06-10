@@ -1,0 +1,17 @@
+{
+  "workflows": {
+    "dev": {
+      "command": "npm run dev -- --port ${PORT} --strictPort --host 127.0.0.1",
+      "longRunning": true,
+      "description": "Start the Vite dev server with HMR on the Nihil-assigned port (bound to 127.0.0.1 so the daemon preview proxy can reach it; served at the preview URL)."
+    },
+    "build": {
+      "command": "npm run build",
+      "description": "Type-check with tsc and produce an optimized production bundle in dist/."
+    },
+    "lint": {
+      "command": "npm run lint",
+      "description": "Run ESLint across the project and report problems."
+    }
+  }
+}

@@ -120,10 +120,9 @@ describe("property-edit-blocks: applyEditBlocks invariants", () => {
       expect(res.applied[0].mode).toBe("fuzzy-ws");
     });
 
-    it("fuzzy fails on ambiguous multiple matches", () => {
+    it("exact match on a unique line succeeds without fuzzy", () => {
       const file = "line 1\nline 2\n";
-      // Fuzzy with flexible whitespace: "line" followed by whitespace, match any digit
-      // This should handle the simple case
+      // "line 1" is unique and matches exactly; no fuzzy fallback is needed.
       const res = applyEditBlocks(file, [{ search: "line 1", replace: "LINE ONE" }]);
       expect(res.ok).toBe(true);
       expect(res.applied[0].mode).toBe("exact");
@@ -139,7 +138,7 @@ describe("property-edit-blocks: applyEditBlocks invariants", () => {
     });
 
     it("detects fuzzy ambiguity with whitespace variations", () => {
-      const file = "TODO fix\\nTODO   fix\\n";
+      const file = "TODO fix\nTODO   fix\n";
       const res = applyEditBlocks(file, [{ search: "TODO  fix", replace: "DONE" }]);
       expect(res.ok).toBe(false);
       expect(res.error?.code).toBe("EDIT_AMBIGUOUS");

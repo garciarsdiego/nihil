@@ -26,24 +26,26 @@ describe("fuzz-adversarial: hostile inputs", () => {
 
   describe("deeply nested fake tags", () => {
     it("1000 unknown tags nested does not crash or hang", () => {
-      const t0 = performance.now();
+      // The parser only treats <nihil-NAME> as a tag when NAME is letters-only and
+      // cleanly terminated (parser.ts: NAME_CHAR + isNameTerminator). Encode each
+      // index as letters so every tag is a genuine unknown tag, not prose.
+      const tagName = (n: number) => "fake" + String(n).replace(/[0-9]/g, d => "abcdefghij".charAt(Number(d)));
       let text = "";
       for (let i = 0; i < 1000; i++) {
-        text += '<nihil-fake' + i + '>\n';
+        text += "<nihil-" + tagName(i) + ">\n";
       }
       for (let i = 999; i >= 0; i--) {
-        text += '</nihil-fake' + i + '>\n';
+        text += "</nihil-" + tagName(i) + ">\n";
       }
       const start = performance.now();
       const { errors } = fullParse(text);
       const elapsed = performance.now() - start;
       // Must terminate quickly (no exponential backtracking)
       expect(elapsed).toBeLessThan(5000);
-      // Each fake tag produces an UNKNOWN_TAG warning
-      // Nested unknown tags: outer tag triggers skip mode which swallows inner tags.
-      // Only the outermost open generates UNKNOWN_TAG; the body is skipped.
-      // This is spec-compliant: unknown tag bodies are consumed without analysis.
-      expect(errors.filter(e => e.code === "UNKNOWN_TAG").length).toBeGreaterThanOrEqual(0);
+      // The outermost open (<nihil-fakea>) triggers skip mode, which swallows every
+      // inner tag until its matching line-start close. Only the outermost open emits
+      // UNKNOWN_TAG; the body is consumed without analysis (spec-compliant).
+      expect(errors.filter(e => e.code === "UNKNOWN_TAG").length).toBe(1);
       // No crashes
     });
   });
@@ -116,8 +118,6 @@ describe("fuzz-adversarial: hostile inputs", () => {
 
   describe("CRLF-only messages", () => {
     it("parser handles CRLF line endings throughout", () => {
-      const text = '\u0060<nihil-write path="src/a.ts">\r\nconst a = 1;\r\nconst b = 2;\r\n</nihil-write>\r\n';
-      // Need to use backticks carefully - just hardcode the string
       const actualText = "<nihil-write path=\"src/a.ts\">\r\nconst a = 1;\r\nconst b = 2;\r\n</nihil-write>\r\n";
       const { closes } = fullParse(actualText);
       expect(closes.length).toBe(1);

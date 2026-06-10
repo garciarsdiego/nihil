@@ -1,9 +1,8 @@
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rename, rm, copyFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { promisify } from "node:util";
 import { normalizeProjectPath } from "@nihil/protocol";
+import { git } from "../git/cli.js";
 import { detectFramework } from "./framework.js";
 import { LogHub } from "./logs.js";
 import { allocatePort, stablePort, DEV_PORT_BASE, PROXY_PORT_BASE } from "./ports.js";
@@ -23,8 +22,6 @@ import {
   type WorkflowRef,
 } from "./target.js";
 import { loadWorkflowConfig, resolveWorkflow, substitutePort } from "./workflows.js";
-
-const execFileAsync = promisify(execFile);
 
 const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
   "node_modules",
@@ -53,19 +50,32 @@ export function detectPackageManager(projectDir: string): "pnpm" | "npm" {
   return existsSync(join(projectDir, "pnpm-lock.yaml")) ? "pnpm" : "npm";
 }
 
+function quoteSpecs(pkgs: readonly string[]): string {
+  return pkgs
+    .map((pkg) => {
+      if (!PACKAGE_SPEC.test(pkg)) {
+        throw new TargetError("INSTALL_FAILED", `invalid package spec "${pkg}"`);
+      }
+      return `"${pkg}"`;
+    })
+    .join(" ");
+}
+
 /** Pure command composition — unit-testable without network or processes. */
 export function buildInstallCommand(
   packageManager: "pnpm" | "npm",
   pkgs: readonly string[],
 ): string {
-  const specs = pkgs.map((pkg) => {
-    if (!PACKAGE_SPEC.test(pkg)) {
-      throw new TargetError("INSTALL_FAILED", `invalid package spec "${pkg}"`);
-    }
-    return `"${pkg}"`;
-  });
   const verb = packageManager === "pnpm" ? "pnpm add" : "npm install";
-  return `${verb} ${specs.join(" ")}`;
+  return `${verb} ${quoteSpecs(pkgs)}`;
+}
+
+export function buildRemoveCommand(
+  packageManager: "pnpm" | "npm",
+  pkgs: readonly string[],
+): string {
+  const verb = packageManager === "pnpm" ? "pnpm remove" : "npm uninstall";
+  return `${verb} ${quoteSpecs(pkgs)}`;
 }
 
 export interface LocalProcessTargetOptions {
@@ -251,7 +261,20 @@ export class LocalProcessTarget implements ExecutionTarget {
       return { ok: true, exitCode: 0, logTail: "" };
     }
     const command = buildInstallCommand(detectPackageManager(this.options.projectDir), pkgs);
-    this.hub.system(`installing packages: ${command}`);
+    return this.runPackageCommand(command, "install");
+  }
+
+  async removePackages(pkgs: string[]): Promise<Result> {
+    this.assertAlive();
+    if (pkgs.length === 0) {
+      return { ok: true, exitCode: 0, logTail: "" };
+    }
+    const command = buildRemoveCommand(detectPackageManager(this.options.projectDir), pkgs);
+    return this.runPackageCommand(command, "remove");
+  }
+
+  private async runPackageCommand(command: string, label: string): Promise<Result> {
+    this.hub.system(`${label}: ${command}`);
 
     const processHub = new LogHub(100);
     const tail: string[] = [];
@@ -267,7 +290,7 @@ export class LocalProcessTarget implements ExecutionTarget {
     const spawned = spawnProcess(command, { cwd: this.options.projectDir, env: this.options.env });
     const tracked: TrackedProcess = { spawned, processHub };
     this.live.add(tracked);
-    this.wireProcessLogs(spawned, "(install)", processHub);
+    this.wireProcessLogs(spawned, `(${label})`, processHub);
 
     const exit = await spawned.exited;
     this.live.delete(tracked);
@@ -490,9 +513,8 @@ export class LocalProcessTarget implements ExecutionTarget {
     }
   }
 
-  private async runGit(args: string[]): Promise<string> {
-    const { stdout } = await execFileAsync("git", args, { cwd: this.options.projectDir });
-    return stdout.trim();
+  private runGit(args: string[]): Promise<string> {
+    return git(this.options.projectDir, args);
   }
 }
 

@@ -2,7 +2,7 @@
 
 **High-level view: phases, goals, exit criteria, and operating model.**
 Task-level detail lives in `HANDOFF.md` §5; architecture in `docs/technical-spec.md`; this document is the map.
-Last updated: 2026-06-10 · Current position: **Phase 2 (Core Loop), Task 3 of 6 in progress**
+Last updated: 2026-06-10 · Current position: **Phase 2 (Core Loop), Tasks 1–3 of 6 complete · Task 4 (BYOK/OmniRoute engine) next**
 
 ---
 
@@ -43,7 +43,7 @@ Last updated: 2026-06-10 · Current position: **Phase 2 (Core Loop), Task 3 of 6
 ## Phase 2 — Core Loop (M1) 🔶 IN PROGRESS
 
 **Goal:** the first end-to-end generation — prompt in, running app out.
-**Scope:** daemon (Fastify HTTP+WS ✅ Task 1); ExecutionTarget interface + local-process target (✅ Task 2: spawn, framework detection, preview proxy, log hub, process-tree kill); runner with git transactions per message (🔶 Task 3); BYOK/OmniRoute engine with the protocol-teaching system prompt (Task 4); `vite-react-shadcn` template (Task 5); minimal Tauri shell — chat, streaming action cards, preview iframe, sidecar lifecycle (Task 6).
+**Scope:** daemon (Fastify HTTP+WS ✅ Task 1); ExecutionTarget interface + local-process target (✅ Task 2: spawn, framework detection, preview proxy, log hub, process-tree kill); runner with git transactions per message (✅ Task 3: parser-event consumption, execute-on-close, dependency batching, longRunning deferral, git transaction with Nihil-Message-Id trailer + rollback, nihil-output feedback loop); BYOK/OmniRoute engine with the protocol-teaching system prompt (🔶 Task 4); `vite-react-shadcn` template (Task 5); minimal Tauri shell — chat, streaming action cards, preview iframe, sidecar lifecycle (Task 6).
 **Exit criterion:** type a prompt in the shell → app generated, dev server running, preview visible, change committed with `Nihil-Message-Id` trailer.
 **Watch items:** Windows process semantics (verified-live approach is working); WS envelope stays internal contract (DECISIONS); `nihil.config.json` model-writability flagged for Task 3 UI treatment.
 

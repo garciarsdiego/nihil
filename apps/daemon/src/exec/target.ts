@@ -101,6 +101,7 @@ export interface ExecutionTarget {
   listFiles(prefix?: string): Promise<string[]>;
   exec(cmd: WorkflowRef | string): ProcessHandle;
   installPackages(pkgs: string[]): Promise<Result>;
+  removePackages(pkgs: string[]): Promise<Result>;
   getPreviewUrl(): Promise<string>;
   streamLogs(): AsyncIterable<LogEvent>;
   snapshot(): Promise<SnapshotRef>;

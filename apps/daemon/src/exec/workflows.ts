@@ -39,7 +39,15 @@ export function loadWorkflowConfig(projectDir: string): NihilConfig {
     }
     throw error;
   }
+  return parseWorkflowConfig(raw);
+}
 
+/**
+ * Validates a nihil.config.json string. The runner uses this on the content it
+ * read through the target (keeping every project read inside the path funnel)
+ * rather than touching the filesystem itself.
+ */
+export function parseWorkflowConfig(raw: string): NihilConfig {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);

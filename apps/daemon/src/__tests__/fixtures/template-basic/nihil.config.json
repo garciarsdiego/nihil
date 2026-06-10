@@ -1,0 +1,6 @@
+{
+  "workflows": {
+    "dev": { "command": "node server.js", "longRunning": true },
+    "hello": { "command": "node -e \"console.log('hello-workflow')\"" }
+  }
+}

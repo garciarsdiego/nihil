@@ -409,32 +409,74 @@ Why: OpenCode swallows provider errors in headless mode; log inspection
 
 ### 4.3 Error Taxonomy Alignment
 
-**Nihil's Engine interface** (from `apps/daemon/src/engine/types.ts`):
+**Nihil's EngineError** (from `apps/daemon/src/engine/errors.ts`, shipped in commit e8c6552):
 ```ts
-interface Engine {
-  // Session management
-  createSession(config: EngineConfig): Promise<EngineSession>
-  
-  // Event streaming
-  onEvent(callback: (event: EngineEvent) => void): void
-}
+export type EngineErrorKind =
+  | "auth"      // 401/403 — terminal
+  | "not_found" // 404 — terminal (bad model or base URL)
+  | "rate_limit" // 429 — retryable
+  | "server"    // 5xx — retryable
+  | "client"    // other 4xx — terminal
+  | "network"   // DNS/TLS/connect/timeout — retryable
+  | "malformed" // unparseable SSE/JSON — terminal
+  | "provider"  // inline error object in the stream — terminal
+  | "aborted";  // user abort — not surfaced as an error
 
-type EngineEvent =
-  | { type: 'message'; content: string }
-  | { type: 'tool-call'; tool: string; args: unknown }
-  | { type: 'tool-result'; tool: string; result: unknown }
-  | { type: 'error'; error: EngineError }
-  | { type: 'file-change'; path: string; change: 'created' | 'modified' | 'deleted' }  // Reserved
+export class EngineError extends Error {
+  readonly kind: EngineErrorKind;
+  readonly status?: number;
+  readonly retryable: boolean;
+  // ...
+}
 ```
 
+**Event Mapping Table (from architecture session):**
+
+| Open-Design Event | Nihil EngineEvent | Notes |
+|-------------------|-------------------|-------|
+| ACP text delta | `{ type: "text"; delta: string }` | Streamed response chunks |
+| ACP session done | `{ type: "done"; finishReason: EngineFinishReason }` | Session completion |
+| ACP file edit | *Not emitted as event* | ACP mode: `editsViaProtocol: false` (agent applies edits itself) |
+| BYOK tool call | *M2 future: `{ type: "tool_call"; ... }`* | Not in M1 surface |
+| Open-design error | **Thrown as EngineError** | Errors are thrown, not emitted as events |
+
 **Adaptation required:**
-- Map open-design's session events to Nihil's EngineEvent union
-- ACP session events → EngineEvent
-- BYOK tool calls → EngineEvent with type: 'tool-call'
-- Errors → EngineEvent with type: 'error' and EngineError subtype
-- Implement file-change variant (currently reserved) for future use
+- ACP mode (`editsViaProtocol: false`): Open-design ACP session emits text deltas → map to `{ type: "text"; delta: string }`
+- Session completion → map to `{ type: "done"; finishReason: "stop" | "length" | ... }`
+- **Errors are thrown as EngineError**, not emitted as events
+  - Map open-design auth failures → `new EngineError("auth", ...)`
+  - Map open-design rate limits → `new EngineError("rate_limit", ...)`
+  - Map open-design network errors → `new EngineError("network", ...)`
+  - Use `classifyHttpStatus()` and `classifyFetchError()` helpers from errors.ts
+- File edits: In ACP mode, the agent applies edits directly (supervised by host), so no file-change events are emitted
+- M2 will add tool_call/file_change/thinking event variants (forward-compatible)
 
 ### 4.4 Nihil Engine Interface Implementation
+
+**Nihil's Engine interface** (from `apps/daemon/src/engine/types.ts`, shipped in commit e8c6552):
+```ts
+export interface Engine {
+  readonly capabilities: EngineCapabilities;
+  stream(request: EngineRequest, opts?: { signal?: AbortSignal }): AsyncIterable<EngineEvent>;
+}
+
+export interface EngineCapabilities {
+  /** mode 2 (BYOK): the model emits <nihil-*> tags the host parses and applies.
+   * mode 1 (ACP, M2): the agent applies edits itself; the host supervises. */
+  editsViaProtocol: boolean;
+}
+
+export interface EngineRequest {
+  system: string;
+  messages: ChatMessage[];
+  model?: string;
+  maxTokens?: number;
+}
+
+export type EngineEvent =
+  | { type: "text"; delta: string }
+  | { type: "done"; finishReason: EngineFinishReason };
+```
 
 Create `vendor-prep/engine/index.ts` that implements Nihil's Engine interface:
 
@@ -442,29 +484,52 @@ Create `vendor-prep/engine/index.ts` that implements Nihil's Engine interface:
 import { ACPClient } from './acp'
 import { detectAgent } from './runtimes/detection'
 import { launchAgent } from './runtimes/launch'
-import type { Engine, EngineConfig, EngineSession, EngineEvent } from '../../types'
+import type { Engine, EngineRequest, EngineEvent } from '../../../types'
+import { EngineError, classifyHttpStatus, classifyFetchError } from '../../../errors'
 
 export class OpenDesignEngine implements Engine {
-  async createSession(config: EngineConfig): Promise<EngineSession> {
+  readonly capabilities = {
+    editsViaProtocol: false, // ACP mode: agent applies edits itself
+  }
+
+  async *stream(request: EngineRequest, opts?: { signal?: AbortSignal }): AsyncIterable<EngineEvent> {
     // Detect CLI from config
-    const agent = await detectAgent(config.agentType)
+    const agent = await detectAgent(/* config from request */)
     
     // Launch agent
-    const session = await launchAgent(agent, config)
+    const session = await launchAgent(agent, /* config */)
     
-    // Wrap ACP session to emit EngineEvent
-    return new OpenDesignSession(session)
+    // Stream ACP session events as EngineEvent
+    try {
+      for await (const event of session.stream()) {
+        if (opts?.signal?.aborted) {
+          throw new EngineError("aborted", "request aborted")
+        }
+        
+        // Map ACP text delta to EngineEvent
+        if (event.type === 'text') {
+          yield { type: "text", delta: event.delta }
+        }
+        
+        // Map ACP session done to EngineEvent
+        if (event.type === 'done') {
+          yield { type: "done", finishReason: event.finishReason }
+        }
+      }
+    } catch (error) {
+      // Convert open-design errors to EngineError
+      if (isAuthError(error)) {
+        throw new EngineError("auth", error.message, { cause: error })
+      }
+      if (isRateLimitError(error)) {
+        throw new EngineError("rate_limit", error.message, { cause: error })
+      }
+      if (isNetworkError(error)) {
+        throw classifyFetchError(error)
+      }
+      throw new EngineError("provider", error.message, { cause: error })
+    }
   }
-  
-  onEvent(callback: (event: EngineEvent) => void): void {
-    // Bridge ACP events to EngineEvent
-  }
-}
-
-class OpenDesignSession implements EngineSession {
-  // Map ACP events to EngineEvent
-  // Handle BYOK tool calls
-  // Stream file changes
 }
 ```
 
@@ -487,12 +552,17 @@ class OpenDesignSession implements EngineSession {
 ### 5.2 Missing Nihil-Side Pieces
 
 **apps/daemon/src/engine/types.ts**
-- Gap: Does not exist yet (mode-1 seam exists but not complete)
-- Resolution: Create this file with Engine interface and EngineEvent types
+- ✅ **Already exists on main** (shipped in Task 4 commit e8c6552)
+- Contains: Engine interface, EngineEvent, EngineCapabilities, EngineRequest
+- ACP mode: `editsViaProtocol: false` (agent applies edits itself)
+- Event surface: `{ type: "text"; delta: string } | { type: "done"; finishReason: EngineFinishReason }`
+- Resolution: Import from `../../../types` in vendor-prep/engine/index.ts
 
 **apps/daemon/src/engine/errors.ts**
-- Gap: Does not exist yet
-- Resolution: Create error taxonomy aligned with Nihil's error handling
+- ✅ **Already exists on main** (shipped in Task 4 commit e8c6552)
+- Contains: EngineError class, EngineErrorKind, classification helpers
+- Helpers: `classifyHttpStatus()`, `classifyFetchError()`, `redactSecrets()`, `extractErrorDetail()`
+- Resolution: Import from `../../../errors` in vendor-prep/engine/index.ts
 
 **Configuration system**
 - Gap: Nihil's Tauri config not yet implemented
@@ -563,7 +633,36 @@ class OpenDesignSession implements EngineSession {
 
 ---
 
-## 7. Estimated M2 Effort
+## 7. Mechanical Cleanup
+
+### BOM Removal
+- **Action completed (2026-06-10):** Stripped U+FEFF BOM from all vendored TypeScript files
+- **Reason:** BOMs can cause issues with tooling and are not needed for UTF-8 files
+- **Method:** Read all files with UTF-8 encoding (without BOM) and rewrite
+- **Files affected:** All 44 vendored TypeScript files
+
+### CRLF→LF Normalization
+- **Action:** Configured via `.gitattributes` in the nihil repository
+- **Reason:** Consistent line endings across platforms (Unix-style LF)
+- **Configuration:** The nihil repo has `.gitattributes` that normalizes text files to LF on commit
+- **Impact:** All vendored files will be normalized to LF when committed
+
+### File Count Updates
+- **Action completed (2026-06-10):** Removed 2 files per architecture review
+  - `runtimes/defs/amr.ts` (open-design model-router product concern)
+  - `runtimes/mmd-routes.ts` (open-design model-router product concern)
+- **Updated count:** 46 → 44 files
+- **Documentation:** Updated VENDOR.md and VENDOR-PLAN.md to reflect new count
+
+### Architecture Review Updates (2026-06-10)
+- **Rewrote §4.3:** Updated error taxonomy alignment to use real EngineError from main (commit e8c6552)
+- **Rewrote §4.4:** Updated Engine interface implementation to use real Engine surface (stream() AsyncIterable, capabilities.editsViaProtocol:false)
+- **Rewrote §5.2:** Updated missing pieces section to reflect that types.ts and errors.ts already exist on main
+- **Added event mapping table:** Documented how open-design events map to Nihil EngineEvent
+
+---
+
+## 8. Estimated M2 Effort
 
 **Extraction and dry-run:** 1 day (this lane)  
 **M2 implementation:** 3-5 days
@@ -577,7 +676,7 @@ class OpenDesignSession implements EngineSession {
 
 ---
 
-## 8. Flags
+## 9. Flags
 
 ### Out-of-Lane Changes Required
 
@@ -585,8 +684,8 @@ class OpenDesignSession implements EngineSession {
 
 ### Future Work (Out-of-Lane for M2)
 
-1. **apps/daemon/src/engine/types.ts** - Create complete Engine interface
-2. **apps/daemon/src/engine/errors.ts** - Create error taxonomy
+1. **apps/daemon/src/engine/types.ts** - ✅ Already exists on main (commit e8c6552)
+2. **apps/daemon/src/engine/errors.ts** - ✅ Already exists on main (commit e8c6552)
 3. **Configuration system** - Integrate with Tauri's app-data directory
 4. **Logging system** - Integrate with Nihil's structured logging
 5. **CLI detection UI** - First-run detection screen in desktop app
@@ -599,7 +698,7 @@ class OpenDesignSession implements EngineSession {
 
 ---
 
-## 9. Attribution
+## 10. Attribution
 
 **Source Repository:** https://github.com/nexu-io/open-design  
 **Pinned Commit:** ca22620b4fa03275d57710e3a9c000ec1171002f  

@@ -8,9 +8,9 @@
 
 ---
 
-## Files Extracted (46 total)
+## Files Extracted (44 total)
 
-### Core Runtime Files (22)
+### Core Runtime Files (21)
 ```
 vendor-prep/engine/acp.ts
 vendor-prep/engine/runtimes/types.ts
@@ -31,16 +31,14 @@ vendor-prep/engine/runtimes/prompt-budget.ts
 vendor-prep/engine/runtimes/prompt-file.ts
 vendor-prep/engine/runtimes/opencode-log.ts
 vendor-prep/engine/runtimes/mcp.ts
-vendor-prep/engine/runtimes/mmd-routes.ts
 vendor-prep/engine/runtimes/local-profiles.ts
 vendor-prep/engine/runtimes/terminal-launch.ts
 ```
 
-### Agent Definition Files (23)
+### Agent Definition Files (22)
 ```
 vendor-prep/engine/runtimes/defs/shared.ts
 vendor-prep/engine/runtimes/defs/aider.ts
-vendor-prep/engine/runtimes/defs/amr.ts
 vendor-prep/engine/runtimes/defs/antigravity.ts
 vendor-prep/engine/runtimes/defs/claude.ts
 vendor-prep/engine/runtimes/defs/codex.ts
@@ -91,7 +89,7 @@ cd vendor-prep/engine
 find . -name "*.ts" -exec grep -l "Vendored from nexu-io/open-design" {} \;
 ```
 
-Expected result: All 46 TypeScript files should contain the attribution header.
+Expected result: All 44 TypeScript files should contain the attribution header.
 
 ---
 
@@ -131,6 +129,10 @@ To update this vendored code in the future:
 ### Dry-Run Phase (Current)
 - Files copied without modification (except attribution headers)
 - Stub files created for external dependencies
+- **Architecture review updates (2026-06-10):**
+  - Removed `runtimes/defs/amr.ts` (open-design model-router product concern)
+  - Removed `runtimes/mmd-routes.ts` (open-design model-router product concern)
+  - Updated file count from 46 to 44
 - No product-specific code stripped yet (deferred to M2 implementation)
 
 ### Planned Modifications (M2 Implementation)
@@ -139,7 +141,7 @@ To update this vendored code in the future:
 - Strip media generation tools from byok-tools.ts
 - Rewire imports to use relative paths
 - Implement Nihil Engine interface adapter
-- Align error taxonomy with Nihil's error handling
+- Align error taxonomy with Nihil's error handling (types.ts and errors.ts already exist on main)
 
 See `vendor-prep/VENDOR-PLAN.md` for detailed modification plan.
 

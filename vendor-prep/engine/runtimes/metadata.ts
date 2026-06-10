@@ -1,4 +1,4 @@
-﻿// Vendored from nexu-io/open-design @ ca22620b4fa03275d57710e3a9c000ec1171002f — Apache-2.0, see NOTICE
+// Vendored from nexu-io/open-design @ ca22620b4fa03275d57710e3a9c000ec1171002f — Apache-2.0, see NOTICE
 
 /** HTTPS links for the web UI when an agent is unavailable. Keys match `AGENT_DEFS[].id`. */
 const AGENT_INSTALL_LINKS: Record<

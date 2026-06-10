@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iframe-lite — Nihil Tier-0 Preview Spike</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d1117; color: #c9d1d9; }
+  header { padding: 12px 16px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 12px; }
+  h1 { font-size: 16px; font-weight: 600; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #1f6feb33; color: #58a6ff; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; height: calc(100vh - 49px); }
+  .panel { display: flex; flex-direction: column; }
+  .panel-header { padding: 8px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; background: #161b22; border-bottom: 1px solid #30363d; color: #8b949e; }
+  textarea { flex: 1; padding: 12px; font-family: monospace; font-size: 13px; line-height: 1.5; background: #0d1117; color: #c9d1d9; border: none; resize: none; outline: none; }
+  #preview { flex: 1; border: none; background: #fff; }
+  .status-bar { padding: 6px 12px; font-size: 11px; background: #161b22; border-top: 1px solid #30363d; color: #8b949e; display: flex; gap: 16px; }
+  .status-bar.error { color: #f85149; border-top-color: #f8514933; }
+  #compile-btn { padding: 4px 12px; font-size: 12px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 6px; cursor: pointer; }
+  #compile-btn:hover { background: #2ea043; }
+  #compile-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<header>
+  <h1>nihil iframe-lite</h1>
+  <span class="badge">Tier-0 spike</span>
+  <span style="flex:1"></span>
+  <button id="compile-btn" onclick="compileAndRender()" disabled>Compile &amp; Render</button>
+</header>
+<main>
+  <div class="panel">
+    <div class="panel-header">FileMap (editable JSON)</div>
+    <textarea id="source" spellcheck="false"></textarea>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Preview (sandboxed iframe)</div>
+    <iframe id="preview" sandbox="allow-scripts" title="app preview"></iframe>
+  </div>
+</main>
+<div class="status-bar" id="status">Loading esbuild-wasm…</div>
+
+<script>
+/*global DEFAULT_FILES textarea btn preview status compileAndRender*/
+var DEFAULT_FILES = {
+  "App.tsx": [
+    'import React from "react";',
+    'import { Header } from "./Header";',
+    '',
+    'export default function App() {',
+    '  return (',
+    '    <div style={{ fontFamily: "system-ui", padding: 24 }}>',
+    '      <Header />',
+    '      <p>Hello from Nihil iframe-lite!</p>',
+    '    </div>',
+    '  );',
+    '}',
+  ].join("\n"),
+  "Header.tsx": [
+    'import React from "react";',
+    '',
+    'export function Header() {',
+    '  return (',
+    '    <h1 style={{ color: "#1f6feb" }}>',
+    '      iframe-lite React Preview',
+    '    </h1>',
+    '  );',
+    '}',
+  ].join("\n"),
+  "index.tsx": [
+    'import React from "react";',
+    'import { createRoot } from "react-dom/client";',
+    'import App from "./App";',
+    'import "./index.css";',
+    '',
+    'var root = createRoot(document.getElementById("root"));',
+    'root.render(React.createElement(App));',
+  ].join("\n"),
+  "index.html": [
+    '<!DOCTYPE html>',
+    '<html>',
+    '<head><meta charset="UTF-8"><title>App</title></head>',
+    '<body><div id="root"></div></body>',
+    '</html>',
+  ].join("\n"),
+  "index.css": [
+    'body {',
+    '  margin: 0;',
+    '  background: #f0f6fc;',
+    '  color: #1a1a2e;',
+    '}',
+    'h1 { margin: 0 0 8px; }',
+    'p { line-height: 1.6; }',
+  ].join("\n"),
+};
+
+var textarea = document.getElementById("source");
+var btn = document.getElementById("compile-btn");
+var preview = document.getElementById("preview");
+var status = document.getElementById("status");
+
+textarea.value = JSON.stringify(DEFAULT_FILES, null, 2);
+
+var esbuildReady = false;
+
+(async function initEsbuild() {
+  status.textContent = "Loading esbuild-wasm from CDN\u2026";
+  try {
+    var esm = await import("https://esm.sh/esbuild-wasm@0.24.0");
+    await esm.default.initialize({
+      wasmURL: "https://esm.sh/esbuild-wasm@0.24.0/esbuild.wasm",
+    });
+    window.__esbuild = esm.default;
+    esbuildReady = true;
+    btn.disabled = false;
+    status.textContent = "Ready. Click Compile & Render to preview.";
+  } catch (e) {
+    status.className = "status-bar error";
+    status.textContent = "esbuild-wasm init failed: " + e.message;
+  }
+})();
+
+function makeFileMapPlugin(files, fileKeys) {
+  return {
+    name: "filemap",
+    setup: function(build) {
+      build.onResolve({ filter: /.*/ }, function(args) {
+        if (args.path.endsWith(".css")) {
+          return { path: args.path, namespace: "filemap" };
+        }
+        if (fileKeys.indexOf(args.path) !== -1) {
+          return { path: args.path, namespace: "filemap" };
+        }
+        var exts = [".tsx", ".ts", ".jsx", ".js"];
+        for (var i = 0; i < exts.length; i++) {
+          var p = args.path + exts[i];
+          if (fileKeys.indexOf(p) !== -1) return { path: p, namespace: "filemap" };
+        }
+        var idxExts = ["/index.tsx", "/index.ts", "/index.jsx", "/index.js"];
+        for (var j = 0; j < idxExts.length; j++) {
+          var ip = args.path + idxExts[j];
+          if (fileKeys.indexOf(ip) !== -1) return { path: ip, namespace: "filemap" };
+        }
+        return undefined;
+      });
+      build.onLoad({ filter: /.*/, namespace: "filemap" }, function(args) {
+        if (args.path.endsWith(".css")) {
+          return {
+            contents: 'var style = document.createElement("style");\nstyle.textContent = ' + JSON.stringify(files[args.path] || "") + ';\ndocument.head.appendChild(style);',
+            loader: "js",
+          };
+        }
+        var content = files[args.path];
+        var loader =
+          args.path.endsWith(".tsx") ? "tsx" :
+          args.path.endsWith(".ts") ? "ts" :
+          args.path.endsWith(".jsx") ? "jsx" : "js";
+        return { contents: content, loader: loader };
+      });
+    },
+  };
+}
+
+window.compileAndRender = async function() {
+  if (!esbuildReady) return;
+  status.className = "status-bar";
+  status.textContent = "Compiling\u2026";
+
+  var files;
+  try {
+    files = JSON.parse(textarea.value);
+  } catch (e) {
+    status.className = "status-bar error";
+    status.textContent = "Invalid JSON: " + e.message;
+    return;
+  }
+
+  var t0 = performance.now();
+  var fileKeys = Object.keys(files);
+  var jsxFiles = fileKeys.filter(function(f) {
+    return f.endsWith(".tsx") || f.endsWith(".jsx");
+  });
+
+  var entryContent = jsxFiles.map(function(f) {
+    return 'import "./' + f + '";';
+  }).join("\n");
+
+  var bundleCode;
+  try {
+    var result = await window.__esbuild.build({
+      stdin: { contents: entryContent, resolveDir: "/project", loader: "tsx" },
+      bundle: true,
+      format: "esm",
+      target: "es2020",
+      platform: "browser",
+      plugins: [makeFileMapPlugin(files, fileKeys)],
+      write: false,
+    });
+    bundleCode = result.outputFiles[0].text;
+  } catch (e) {
+    var em = performance.now() - t0;
+    status.className = "status-bar error";
+    status.textContent = "Compile error (" + em.toFixed(0) + "ms): " + e.message;
+    return;
+  }
+
+  var elapsed = performance.now() - t0;
+  status.textContent = "Compiled " + jsxFiles.length + " files in " + elapsed.toFixed(0) + "ms.";
+
+  var importMap = {
+    imports: {
+      "react": "https://esm.sh/react@18.2.0",
+      "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    },
+  };
+
+  var cssContent = files["index.css"] || "";
+  var html = '<!DOCTYPE html>\n<html>\n<head><meta charset="UTF-8">\n' +
+    '<script type="importmap">' + JSON.stringify(importMap) + '<\/script>\n' +
+    '<style>' + cssContent + '<\/style>\n' +
+    '</head>\n<body><div id="root"></div>\n' +
+    '<script type="module">\n' + bundleCode + '\n<\/script>\n' +
+    '</body>\n</html>';
+
+  preview.srcdoc = html;
+  status.textContent = "Rendered " + jsxFiles.length + " files in " + elapsed.toFixed(0) + "ms.";
+};
+</script>
+</body>
+</html>

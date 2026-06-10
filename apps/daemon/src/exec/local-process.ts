@@ -12,6 +12,7 @@ import {
   TargetError,
   type ExecutionTarget,
   type FileMap,
+  type FileStat,
   type FrameworkKind,
   type LogEvent,
   type ProcessExit,
@@ -203,6 +204,23 @@ export class LocalProcessTarget implements ExecutionTarget {
     const results: string[] = [];
     await walkDirectory(start, root, results);
     return results.sort();
+  }
+
+  async statFiles(prefix?: string): Promise<FileStat[]> {
+    this.assertAlive();
+    const root = resolve(this.options.projectDir);
+    const paths = await this.listFiles(prefix);
+    const stats = await Promise.all(
+      paths.map(async (path): Promise<FileStat | null> => {
+        try {
+          const s = await stat(join(root, path));
+          return { path, mtimeMs: s.mtimeMs, size: s.size };
+        } catch {
+          return null; // raced deletion — drop it
+        }
+      }),
+    );
+    return stats.filter((s): s is FileStat => s !== null);
   }
 
   exec(cmd: WorkflowRef | string): ProcessHandle {

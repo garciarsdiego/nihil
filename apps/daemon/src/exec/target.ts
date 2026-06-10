@@ -57,6 +57,13 @@ export interface Result {
   logTail: string;
 }
 
+export interface FileStat {
+  /** Project-relative, forward slashes (same shape as listFiles entries). */
+  path: string;
+  mtimeMs: number;
+  size: number;
+}
+
 export interface SnapshotRef {
   kind: "git";
   ref: string;
@@ -99,6 +106,8 @@ export interface ExecutionTarget {
    * excluding node_modules, .git, and build artifacts.
    */
   listFiles(prefix?: string): Promise<string[]>;
+  /** listFiles plus mtimeMs/size per file, for context-budget ordering. */
+  statFiles(prefix?: string): Promise<FileStat[]>;
   exec(cmd: WorkflowRef | string): ProcessHandle;
   installPackages(pkgs: string[]): Promise<Result>;
   removePackages(pkgs: string[]): Promise<Result>;

@@ -3,6 +3,7 @@ import { parseWorkflowConfig, resolveWorkflow } from "../../exec/workflows.js";
 import type {
   ExecutionTarget,
   FileMap,
+  FileStat,
   LogEvent,
   ProcessHandle,
   Result,
@@ -20,19 +21,28 @@ import type { CommitOptions, CommitResult, GitBackend, TxnMarker } from "../../g
  */
 export class MemoryProject {
   files = new Map<string, string>();
+  /** Monotonic pseudo-mtime per path (write order), for statFiles ordering. */
+  readonly mtimes = new Map<string, number>();
   readonly commits = new Map<string, Map<string, string>>();
   head: string;
   #seq = 0;
+  #clock = 0;
 
   constructor() {
     this.head = this.#newRef();
     this.commits.set(this.head, new Map());
   }
 
+  /** Bumps a path's pseudo-mtime; call on every working-tree mutation. */
+  touch(path: string): void {
+    this.mtimes.set(norm(path), ++this.#clock);
+  }
+
   /** Seed pre-existing files into both the working tree and the HEAD commit. */
   seed(files: Record<string, string>): void {
     for (const [path, content] of Object.entries(files)) {
       this.files.set(norm(path), content);
+      this.touch(path);
     }
     this.commits.set(this.head, new Map(this.files));
   }
@@ -116,6 +126,7 @@ export class FakeTarget implements ExecutionTarget {
   async writeFiles(files: FileMap): Promise<void> {
     for (const [path, content] of Object.entries(files)) {
       this.project.files.set(norm(path), content);
+      this.project.touch(path);
     }
   }
 
@@ -132,6 +143,7 @@ export class FakeTarget implements ExecutionTarget {
     }
     this.project.files.delete(norm(from));
     this.project.files.set(norm(to), content);
+    this.project.touch(to);
   }
 
   async copy(from: string, to: string): Promise<void> {
@@ -140,12 +152,24 @@ export class FakeTarget implements ExecutionTarget {
       throw new TargetError("FILE_NOT_FOUND", `file not found: ${from}`);
     }
     this.project.files.set(norm(to), content);
+    this.project.touch(to);
   }
 
   async listFiles(prefix?: string): Promise<string[]> {
     const all = [...this.project.files.keys()];
     const filtered = prefix ? all.filter((p) => p === prefix || p.startsWith(`${prefix}/`)) : all;
     return filtered.sort();
+  }
+
+  async statFiles(prefix?: string): Promise<FileStat[]> {
+    const paths = await this.listFiles(prefix);
+    return paths.map((path) => ({
+      path,
+      mtimeMs: this.project.mtimes.get(path) ?? 0,
+      // UTF-16 code units, not on-disk bytes (LocalProcessTarget uses fs.stat
+      // size) — they agree for the ASCII fixtures these tests use.
+      size: (this.project.files.get(path) ?? "").length,
+    }));
   }
 
   exec(cmd: WorkflowRef | string): ProcessHandle {

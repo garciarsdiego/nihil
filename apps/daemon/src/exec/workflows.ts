@@ -8,6 +8,8 @@ const workflowSchema = z.object({
   // SPEC §7: server-starting workflows declare longRunning; the runner uses
   // it to defer them to last, local-process uses it to gate port/proxy/ready.
   longRunning: z.boolean().optional().default(false),
+  /** Human-readable note rendered into the engine prompt's {{WORKFLOWS}} slot. */
+  description: z.string().optional(),
 });
 
 const nihilConfigSchema = z.object({

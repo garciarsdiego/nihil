@@ -1,0 +1,15 @@
+Nihil
+Copyright 2026 Diego Garcia (garciarsdiego)
+
+This product includes patterns and/or vendored code derived from the
+following Apache-2.0 and MIT licensed projects:
+
+- open-design (nexu-io) — Apache-2.0 — agent runtime (ACP client, CLI
+  registry, BYOK loop) vendoring planned under apps/daemon/src/engine/
+- open-lovable (Firecrawl) — MIT — cloud sandbox provider factory pattern
+- bolt.new (StackBlitz) — MIT — streaming message-parser/action-runner pattern
+- dyad (dyad-sh) — Apache-2.0 — architecture patterns (tag protocol,
+  local execution, git versioning). Nothing derived from dyad's src/pro/.
+
+System prompts are original works informed by published pattern analysis.
+No code derived from AGPL-licensed projects.

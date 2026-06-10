@@ -121,7 +121,13 @@ Apply chain per `<nihil-edit>`: deterministic search/replace → on mismatch, fu
 ```ts
 interface ExecutionTarget {
   init(template: TemplateRef): Promise<void>
+  readFile(path: string): Promise<string>              // edit apply-chain input
   writeFiles(files: FileMap): Promise<void>
+  deleteFile(path: string): Promise<void>
+  rename(from: string, to: string): Promise<void>
+  copy(from: string, to: string): Promise<void>
+  listFiles(prefix?: string): Promise<string[]>        // recursive, project-relative;
+                                                       // excludes node_modules/.git/build artifacts
   exec(cmd: WorkflowRef | string): ProcessHandle      // streamed
   installPackages(pkgs: string[]): Promise<Result>
   getPreviewUrl(): Promise<string>
@@ -130,6 +136,13 @@ interface ExecutionTarget {
   destroy(): Promise<void>
 }
 ```
+
+File-verb methods exist so the runner's execute-on-close path funnels every
+model-provided path through `normalizeProjectPath` regardless of target tier
+(DECISIONS #12). Git commit/rollback transactionality lives in the daemon git
+layer against the shared project dir, not in the target — `snapshot()` only
+returns a ref; cloud targets will add a target-side `restore(ref)` when they
+arrive (DECISIONS #13).
 
 | Tier | Impl | When | Source pattern |
 |---|---|---|---|

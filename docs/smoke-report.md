@@ -88,3 +88,72 @@ with output size.
 
 **Decision deferred:** per the session plan, no system-prompt tuning was done — this
 report is the measurement to bring to the architecture session.
+
+---
+
+# Round 2 — seeded edit-apply chain + token usage
+
+**Date:** 2026-06-11 · same model/endpoint (`cc/claude-sonnet-4-6` via OmniRoute).
+Run: `npx tsx scripts/smoke-e2e.ts round2`.
+
+Round 1 could not exercise the edit-apply path (the fresh template lacked the files
+the items assume). Round 2 **seeds the project** with 3 fixture files
+(`src/components/StatusBadge.tsx`, `src/components/Header.tsx` with inline
+`useState` + a `<nav>` lacking an aria-label, `src/pages/Landing.tsx` with "Get
+started" appearing twice) and runs the four edit-dynamics items. The harness now
+**re-runs `applyEditBlocks` against the known seed content** to read the apply mode
+directly (exact vs fuzzy-ws), and the engine was extended to request + surface a
+token-`usage` block (`stream_options.include_usage`).
+
+## Results
+
+| Item | Actions | Apply chain (vs seed) | Committed | prompt tok | completion tok | total | latency |
+|---|---|---|---|---|---|---|---|
+| `001` status indicator | 2 × edit | Landing **2× exact**; SiteHeader edit on a template file (not a seed) | ✅ | 2052 | 2847 | 4899 | 60.1 s |
+| `002` "Get started" → "Start building" everywhere | 1 × edit (2 blocks) | Landing **2× exact** — split into two distinct-context blocks; **no EDIT_AMBIGUOUS** | ✅ | 2030 | 218 | 2248 | 20.6 s |
+| `003` extract mobile-menu state into a hook | 1 × write + 1 × edit (3 blocks) | Header **3× exact, sequential** (imports → state → handler) + wrote `useMobileMenu.ts` | ✅ | 13387 | 1936 | 15323 | 30.1 s |
+| `004` add aria-label to the nav landmark | 1 × edit | Header **1× exact** | ✅ | 13366 | 1466 | 14832 | 25.4 s |
+
+**Aggregate:** 8 edit blocks applied, **8 exact / 0 fuzzy-ws / 0 EDIT_NO_MATCH / 0
+EDIT_AMBIGUOUS**. valid-tag rate **1.00**, elision **0**, key leak **0**. Total
+**~37.3 K tokens** across 4 turns (prompt 30.8 K + completion 6.5 K); **cost $0**
+(Claude OAuth tier via OmniRoute). Latency 20–60 s, dominated by completion size +
+the larger (seeded) prompts on 003/004.
+
+## Reading
+
+**The edit-apply chain works end-to-end with a real model, and the model edits
+byte-exact.** All 8 SEARCH blocks matched at the **exact** step — the model copies
+the file content it is shown faithfully, so the whitespace-fuzzy fallback was never
+needed. That is the desired behavior; it also means the **fuzzy-ws path remains
+unexercised by a real model** (it is covered by the protocol property tests, not
+here) — to force it you would have to feed the model a deliberately whitespace-drifted
+excerpt.
+
+**Ambiguity is avoided by construction (002).** Asked to change "Get started"
+"everywhere", the model did **not** emit a single search that would match twice;
+it emitted one `<nihil-edit>` with **two distinct-context blocks** (disambiguating
+the second occurrence by its `variant="secondary"` attribute) — the corpus rubric's
+pass behavior. So `EDIT_AMBIGUOUS` was avoided rather than triggered.
+
+**Sequential multi-block edits apply in order (003).** The model wrote the new hook
+and emitted a 3-block edit whose later blocks match text that only exists after the
+earlier blocks — all three applied exact, in order.
+
+**Token usage is now captured** (engine `stream_options.include_usage` →
+`done.usage` → `TurnResult.usage`). Prompt cost scales with seeded context (2 K vs
+13 K when `Header.tsx` is in play).
+
+## Gaps / follow-ups (round 2)
+
+1. **The runner does not surface a fuzzy-ws warning.** On a successful normalized
+   (whitespace-fuzzy) apply the runner just writes the file (`runner.ts` edit path)
+   — it never feeds the SPEC §7 / eval-004 "ws-normalized, here is the exact form"
+   warning back to the model. Real models didn't hit this here (they matched exact),
+   but the warning is part of the contract and is currently missing. Architecture
+   decision: add it (the apply chain already returns the mode in `applied[].mode`).
+2. **Cross-model round (Track B #3) is pending** the OmniRoute model id for a
+   non-Claude tier (Kimi / GLM) — the real protocol-robustness test. Harness is
+   ready; only the `NIHIL_ENGINE_MODEL` value is needed.
+3. Fuzzy-ws remains unexercised by a live model (see Reading) — optional: a fixture
+   with deliberately drifted whitespace to confirm the fallback + (1)'s warning.

@@ -8,7 +8,7 @@ import { assembleSystemPrompt, type PromptMode } from "./prompt/assemble.js";
 import { selectContext } from "./prompt/context.js";
 import { renderContextFiles, renderFileTree, renderWorkflows } from "./prompt/slots.js";
 import type { Session } from "./session.js";
-import type { Engine, EngineFinishReason } from "./types.js";
+import type { Engine, EngineFinishReason, EngineUsage } from "./types.js";
 
 export interface TurnObserver {
   onAssistantDelta?(delta: string): void;
@@ -32,6 +32,8 @@ export interface TurnResult {
   /** User-visible chat notices (context truncation, token-limit, engine error). */
   warnings: string[];
   engineError?: EngineError;
+  /** Token accounting, when the provider reported a usage block. */
+  usage?: EngineUsage;
 }
 
 const LENGTH_WARNING =
@@ -69,7 +71,12 @@ export async function runTurn(
 
   // Held in an object so the closure's assignments survive control-flow
   // narrowing once the generator runs inside runMessage.
-  const capture: { assistantText: string; finishReason: EngineFinishReason; engineError?: EngineError } = {
+  const capture: {
+    assistantText: string;
+    finishReason: EngineFinishReason;
+    engineError?: EngineError;
+    usage?: EngineUsage;
+  } = {
     assistantText: "",
     finishReason: "unknown",
   };
@@ -83,6 +90,9 @@ export async function runTurn(
           yield capture.assistantText;
         } else if (event.type === "done") {
           capture.finishReason = event.finishReason;
+          if (event.usage !== undefined) {
+            capture.usage = event.usage;
+          }
         }
         // Unknown future variants (M2 file_change/tool_call) are ignored here
         // so adding them does not break this consumer (DECISIONS #22).
@@ -101,7 +111,7 @@ export async function runTurn(
   })();
 
   const result = await deps.runner.runMessage(messageId, accumulated, { signal: opts.signal });
-  const { assistantText, finishReason, engineError } = capture;
+  const { assistantText, finishReason, engineError, usage } = capture;
 
   // Record the exchange only when the turn actually produced a committed
   // result with real assistant output. A rolled-back turn (user abort) and a
@@ -130,7 +140,7 @@ export async function runTurn(
     warnings.push(`Engine error (${engineError.kind}): ${engineError.message}`);
   }
 
-  return { messageId, assistantText, finishReason, result, warnings, engineError };
+  return { messageId, assistantText, finishReason, result, warnings, engineError, usage };
 }
 
 interface WorkflowConfigResult {

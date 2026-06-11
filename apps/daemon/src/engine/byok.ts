@@ -15,6 +15,7 @@ import {
   type EngineEvent,
   type EngineFinishReason,
   type EngineRequest,
+  type EngineUsage,
 } from "./types.js";
 
 const MAX_RETRIES = 2; // 3 attempts total
@@ -28,6 +29,7 @@ export interface ByokEngineDeps {
 interface OpenAiChunk {
   error?: unknown;
   choices?: { delta?: { content?: unknown }; finish_reason?: unknown }[];
+  usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown } | null;
 }
 
 /**
@@ -61,6 +63,9 @@ export class ByokEngine implements Engine {
       messages: [{ role: "system", content: request.system }, ...request.messages],
       max_tokens: request.maxTokens ?? this.#config.maxTokens,
       stream: true,
+      // Ask OpenAI-compatible providers for a final usage chunk (ignored by
+      // providers that don't support it; surfaced on the `done` event).
+      stream_options: { include_usage: true },
     });
 
     const response = await this.#connect(url, headers, body, opts.signal);
@@ -104,6 +109,7 @@ export class ByokEngine implements Engine {
 
   async *#consume(response: Response, signal?: AbortSignal): AsyncGenerator<EngineEvent> {
     let finishReason: EngineFinishReason = "unknown";
+    let usage: EngineUsage | undefined;
     for await (const data of readSseFrames(response.body as ReadableStream<Uint8Array>, signal)) {
       if (data === "[DONE]") {
         break;
@@ -128,11 +134,15 @@ export class ByokEngine implements Engine {
       if (typeof reason === "string" && reason.length > 0) {
         finishReason = normalizeFinishReason(reason);
       }
+      const parsedUsage = parseUsage(chunk.usage);
+      if (parsedUsage !== undefined) {
+        usage = parsedUsage;
+      }
     }
     if (signal?.aborted) {
       return;
     }
-    yield { type: "done", finishReason };
+    yield usage !== undefined ? { type: "done", finishReason, usage } : { type: "done", finishReason };
   }
 
   /** Strip the known api key (and generic secret patterns) from any string
@@ -142,6 +152,25 @@ export class ByokEngine implements Engine {
     const key = this.#config.apiKey;
     return key !== undefined && key.length > 0 ? generic.split(key).join("[redacted]") : generic;
   }
+}
+
+function parseUsage(raw: OpenAiChunk["usage"]): EngineUsage | undefined {
+  if (typeof raw !== "object" || raw === null) {
+    return undefined;
+  }
+  const prompt = raw.prompt_tokens;
+  const completion = raw.completion_tokens;
+  const total = raw.total_tokens;
+  if (typeof prompt !== "number" && typeof completion !== "number" && typeof total !== "number") {
+    return undefined;
+  }
+  const promptTokens = typeof prompt === "number" ? prompt : 0;
+  const completionTokens = typeof completion === "number" ? completion : 0;
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens: typeof total === "number" ? total : promptTokens + completionTokens,
+  };
 }
 
 function streamErrorMessage(chunk: OpenAiChunk): string | null {

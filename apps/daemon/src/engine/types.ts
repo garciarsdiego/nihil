@@ -15,6 +15,14 @@ export interface EngineRequest {
 
 export type EngineFinishReason = "stop" | "length" | "content_filter" | "tool_calls" | "unknown";
 
+/** Normalized token accounting from an OpenAI-compatible `usage` block, when the
+ * provider reports it (requires `stream_options.include_usage`). */
+export interface EngineUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 /**
  * Forward-compatible engine event union. M1 mode 2 (BYOK) emits text/done.
  * M2 mode 1 (ACP) will add `file_change` / `tool_call` / `thinking` variants;
@@ -22,7 +30,7 @@ export type EngineFinishReason = "stop" | "length" | "content_filter" | "tool_ca
  */
 export type EngineEvent =
   | { type: "text"; delta: string }
-  | { type: "done"; finishReason: EngineFinishReason };
+  | { type: "done"; finishReason: EngineFinishReason; usage?: EngineUsage };
 
 export interface EngineCapabilities {
   /** mode 2 (BYOK): the model emits <nihil-*> tags the host parses and applies.
